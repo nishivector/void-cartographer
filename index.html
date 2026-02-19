@@ -618,7 +618,7 @@
         
         document.addEventListener('mousemove', (e) => {
             if (!gameState.playing) return;
-            if (document.pointerLockElement !== renderer.domElement) return;
+            if (!isTouch && document.pointerLockElement !== renderer.domElement) return;
             
             const sensitivity = 0.002;
             gameState.euler.y -= e.movementX * sensitivity;
@@ -822,3 +822,97 @@
     </script>
 </body>
 </html>
+
+<!-- Touch Controls -->
+<style>
+#touch-controls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 200px;
+    z-index: 150;
+    pointer-events: auto;
+}
+@media (max-width: 768px), (pointer: coarse) {
+    #touch-controls { display: block; }
+    #crosshair { display: none; }
+}
+.touch-btn {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    background: rgba(0, 255, 255, 0.2);
+    border: 2px solid #00ffff;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #00ffff;
+    font-size: 24px;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.touch-btn:active { background: rgba(0, 255, 255, 0.4); }
+#btn-up { bottom: 100px; left: 50%; transform: translateX(-50%); }
+#btn-down { bottom: 20px; left: 50%; transform: translateX(-50%); }
+#btn-left { bottom: 60px; left: 20%; }
+#btn-right { bottom: 60px; right: 20%; }
+#btn-look {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 0, 255, 0.2);
+    border: 2px solid #ff00ff;
+    border-radius: 50%;
+}
+</style>
+<div id="touch-controls">
+    <div class="touch-btn" id="btn-up">▲</div>
+    <div class="touch-btn" id="btn-down">▼</div>
+    <div class="touch-btn" id="btn-left">◀</div>
+    <div class="touch-btn" id="btn-right">▶</div>
+    <div id="btn-look"></div>
+</div>
+
+<script>
+// Touch controls
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+if (isTouch) {
+    document.getElementById('btn-up').ontouchstart = () => gameState.moveForward = true;
+    document.getElementById('btn-up').ontouchend = () => gameState.moveForward = false;
+    document.getElementById('btn-down').ontouchstart = () => gameState.moveBackward = true;
+    document.getElementById('btn-down').ontouchend = () => gameState.moveBackward = false;
+    document.getElementById('btn-left').ontouchstart = () => gameState.moveLeft = true;
+    document.getElementById('btn-left').ontouchend = () => gameState.moveLeft = false;
+    document.getElementById('btn-right').ontouchstart = () => gameState.moveRight = true;
+    document.getElementById('btn-right').ontouchend = () => gameState.moveRight = false;
+    
+    // Touch look
+    let lookTouch = null;
+    const lookArea = document.getElementById('btn-look');
+    lookArea.ontouchstart = (e) => { lookTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
+    lookArea.ontouchmove = (e) => {
+        if (!lookTouch || !gameState.playing) return;
+        const dx = (e.touches[0].clientX - lookTouch.x) * 0.005;
+        const dy = (e.touches[0].clientY - lookTouch.y) * 0.005;
+        camera.rotation.y -= dx;
+        camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x - dy));
+        lookTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    lookArea.ontouchend = () => { lookTouch = null; };
+    
+    // Tap to interact on mobile
+    renderer.domElement.ontouchstart = (e) => {
+        if (!gameState.playing) return;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2(0, 0);
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(anchorPoints);
+        if (intersects.length > 0) anchorAnchor(intersects[0].object);
+    };
+}
+</script>
