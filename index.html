@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Void Cartographer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Rajdhani', sans-serif;
+        }
+        
+        #game-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        /* HUD */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .hud-element {
+            position: absolute;
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            letter-spacing: 2px;
+        }
+        
+        #resonance {
+            top: 20px;
+            left: 20px;
+            font-size: 18px;
+        }
+        
+        #level {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+        }
+        
+        #mapped {
+            top: 20px;
+            right: 20px;
+            font-size: 18px;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            border: 2px solid #00ffff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        /* Screens */
+        .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at center, #0a0a1a 0%, #000 100%);
+            z-index: 200;
+            pointer-events: auto;
+        }
+        
+        .screen.hidden {
+            display: none;
+        }
+        
+        .screen h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 64px;
+            color: #00ffff;
+            text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #0088ff;
+            margin-bottom: 20px;
+            letter-spacing: 8px;
+        }
+        
+        .screen h2 {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 24px;
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+            margin-bottom: 40px;
+            font-weight: 300;
+        }
+        
+        .screen p {
+            color: #aaa;
+            font-size: 16px;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.8;
+            margin-bottom: 40px;
+        }
+        
+        .screen .start-btn {
+            font-family: 'Orbitron', monospace;
+            font-size: 20px;
+            padding: 15px 40px;
+            background: transparent;
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            cursor: pointer;
+            letter-spacing: 4px;
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+        
+        .screen .start-btn:hover {
+            background: #00ffff;
+            color: #000;
+            box-shadow: 0 0 30px #00ffff;
+        }
+        
+        #game-over h1 {
+            color: #ff4400;
+            text-shadow: 0 0 20px #ff4400, 0 0 40px #ff0000;
+        }
+        
+        #victory h1 {
+            color: #ffd700;
+            text-shadow: 0 0 20px #ffd700, 0 0 40px #ff8800;
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 40px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        #warning {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff4400;
+            font-family: 'Orbitron', monospace;
+            font-size: 18px;
+            text-shadow: 0 0 10px #ff4400;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 150;
+        }
+        
+        #warning.active {
+            opacity: 1;
+            animation: pulse 0.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <!-- HUD -->
+    <div id="hud">
+        <div id="resonance" class="hud-element">RESONANCE: 3</div>
+        <div id="level" class="hud-element">EDGE WORLD 1/5</div>
+        <div id="mapped" class="hud-element">MAPPED: 0/5</div>
+        <div id="crosshair"></div>
+    </div>
+    
+    <!-- Warning -->
+    <div id="warning">⚠ SILENCE APPROACHING ⚠</div>
+    
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen">
+        <h1>VOID CARTOGRAPHER</h1>
+        <h2>Chart the Edges of Reality</h2>
+        <p>In 3402, humanity discovered that reality has edges — boundaries where physics breaks down and thought becomes manifest. You are a Void Cartographer. Your mission: chart the uncharted edges before the Silence consumes everything.</p>
+        <button class="start-btn" id="start-btn">BEGIN MAPPING</button>
+        <div class="instructions">WASD to move • Mouse to look • Click to anchor points</div>
+    </div>
+    
+    <!-- Game Over -->
+    <div id="game-over" class="screen hidden">
+        <h1>CONSUMED</h1>
+        <h2>The Silence Has Taken You</h2>
+        <p>Your mapping was incomplete. The void claims another cartographer.</p>
+        <button class="start-btn" id="restart-btn">TRY AGAIN</button>
+    </div>
+    
+    <!-- Victory -->
+    <div id="victory" class="screen hidden">
+        <h1>CARTOGRAPHY COMPLETE</h1>
+        <h2>Reality's Edges Are Charted</h2>
+        <p>You have successfully mapped five edge worlds. Humanity is safe — for now.</p>
+        <button class="start-btn" id="play-again-btn">EXPLORE AGAIN</button>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        
+        // ============ TONE.JS AUDIO ============
+        const Tone = await import('https://cdn.jsdelivr.net/npm/tone@15.1.22/+esm');
+        
+        // Audio setup
+        let ambientSynth, anchorSynth, crystalSynth, riftSynth, victorySynth;
+        let audioInitialized = false;
+        
+        async function initAudio() {
+            if (audioInitialized) return;
+            await Tone.start();
+            
+            // Ambient drone
+            ambientSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sine' },
+                envelope: { attack: 2, decay: 1, sustain: 0.8, release: 2 }
+            }).toDestination();
+            ambientSynth.volume.value = -15;
+            
+            // Anchor ping
+            anchorSynth = new Tone.Synth({
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.5 }
+            }).toDestination();
+            anchorSynth.volume.value = -5;
+            
+            // Crystal collect
+            crystalSynth = new Tone.Synth({
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.02, decay: 0.3, sustain: 0.1, release: 0.3 }
+            }).toDestination();
+            crystalSynth.volume.value = -8;
+            
+            // Rift warning
+            riftSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.05,
+                octaves: 2,
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 }
+            }).toDestination();
+            riftSynth.volume.value = -10;
+            
+            // Victory
+            victorySynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'square' },
+                envelope: { attack: 0.1, decay: 0.3, sustain: 0.5, release: 1 }
+            }).toDestination();
+            victorySynth.volume.value = -8;
+            
+            audioInitialized = true;
+        }
+        
+        function playAmbient() {
+            if (!ambientSynth) return;
+            ambientSynth.triggerAttack(['C2', 'G2'], Tone.now());
+        }
+        
+        function stopAmbient() {
+            if (!ambientSynth) return;
+            ambientSynth.triggerRelease();
+        }
+        
+        function playAnchorSound() {
+            if (!anchorSynth) return;
+            anchorSynth.triggerAttackRelease('C6', '8n');
+            anchorSynth.triggerAttackRelease('E6', '8n', '+0.05');
+        }
+        
+        function playCrystalSound() {
+            if (!crystalSynth) return;
+            crystalSynth.triggerAttackRelease('G5', '16n');
+            crystalSynth.triggerAttackRelease('C6', '16n', '+0.1');
+            crystalSynth.triggerAttackRelease('E6', '16n', '+0.2');
+        }
+        
+        function playRiftSound() {
+            if (!riftSynth) return;
+            riftSynth.triggerAttackRelease('C1', '8n');
+        }
+        
+        function playVictorySound() {
+            if (!victorySynth) return;
+            victorySynth.triggerAttackRelease('C4', '2n');
+            victorySynth.triggerAttackRelease('E4', '2n', '+0.2');
+            victorySynth.triggerAttackRelease('G4', '2n', '+0.4');
+            victorySynth.triggerAttackRelease('C5', '1n', '+0.6');
+        }
+        
+        // ============ THREE.JS SETUP ============
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        scene.fog = new THREE.Fog(0x0a0a12, 0.1, 50);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+        
+        // Post-processing
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+        
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.4, 0.6, 0.6
+        );
+        composer.addPass(bloomPass);
+        
+        // Lighting (MAX 4)
+        const ambientLight = new THREE.AmbientLight(0x111122, 0.2);
+        scene.add(ambientLight);
+        
+        const playerLight = new THREE.PointLight(0x00ffff, 0.8, 15);
+        scene.add(playerLight);
+        
+        // Accent lights for visual interest
+        const accentLight1 = new THREE.PointLight(0xff00ff, 0.3, 30);
+        accentLight1.position.set(10, 5, 10);
+        scene.add(accentLight1);
+        
+        const accentLight2 = new THREE.PointLight(0x00ff88, 0.3, 30);
+        accentLight2.position.set(-10, 5, -10);
+        scene.add(accentLight2);
+        
+        // ============ GAME STATE ============
+        const gameState = {
+            playing: false,
+            level: 1,
+            maxLevels: 5,
+            resonance: 3,
+            mapped: 0,
+            mappedNeeded: 5,
+            velocity: new THREE.Vector3(),
+            moveForward: false,
+            moveBackward: false,
+            moveLeft: false,
+            moveRight: false,
+            canJump: true,
+            isSprinting: false,
+            euler: new THREE.Euler(0, 0, 0, 'YXZ'),
+            anchorables: [],
+            crystals: [],
+            rifts: [],
+            anchoredPoints: [],
+            silenceDistance: 8,
+            warningThreshold: 12
+        };
+        
+        // ============ PROCEDURAL GENERATION ============
+        const colors = [0x00ffff, 0xff00ff, 0xffd700, 0x00ff88, 0xff6600];
+        const geometries = [
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.OctahedronGeometry(0.7),
+            new THREE.IcosahedronGeometry(0.6),
+            new THREE.TetrahedronGeometry(0.8),
+            new THREE.TorusGeometry(0.5, 0.2, 8, 16)
+        ];
+        
+        function generateWorld() {
+            // Clear previous world
+            gameState.anchorables.forEach(obj => scene.remove(obj));
+            gameState.crystals.forEach(obj => scene.remove(obj));
+            gameState.rifts.forEach(obj => scene.remove(obj));
+            gameState.anchoredPoints.forEach(obj => scene.remove(obj));
+            
+            gameState.anchorables = [];
+            gameState.crystals = [];
+            gameState.rifts = [];
+            gameState.anchoredPoints = [];
+            gameState.mapped = 0;
+            
+            const levelSeed = gameState.level * 12345;
+            const pseudoRandom = (n) => {
+                const x = Math.sin(levelSeed + n) * 10000;
+                return x - Math.floor(x);
+            };
+            
+            // Generate anchorable geometry
+            const numAnchorables = 8 + gameState.level * 2;
+            for (let i = 0; i < numAnchorables; i++) {
+                const angle = pseudoRandom(i) * Math.PI * 2;
+                const dist = 5 + pseudoRandom(i + 100) * 20;
+                const x = Math.cos(angle) * dist;
+                const z = Math.sin(angle) * dist;
+                const y = pseudoRandom(i + 200) * 8 - 2;
+                
+                const geoIndex = Math.floor(pseudoRandom(i + 300) * geometries.length);
+                const colorIndex = Math.floor(pseudoRandom(i + 400) * colors.length);
+                
+                const material = new THREE.MeshBasicMaterial({
+                    color: colors[colorIndex],
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const mesh = new THREE.Mesh(geometries[geoIndex], material);
+                mesh.position.set(x, y, z);
+                mesh.userData.isAnchorable = true;
+                mesh.userData.originalColor = colors[colorIndex];
+                
+                // Add inner glow
+                const innerMat = new THREE.MeshBasicMaterial({
+                    color: colors[colorIndex],
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const inner = new THREE.Mesh(geometries[geoIndex].clone(), innerMat);
+                inner.scale.setScalar(0.7);
+                mesh.add(inner);
+                
+                scene.add(mesh);
+                gameState.anchorables.push(mesh);
+            }
+            
+            // Generate crystals
+            const numCrystals = 3 + gameState.level;
+            for (let i = 0; i < numCrystals; i++) {
+                const angle = pseudoRandom(i + 500) * Math.PI * 2;
+                const dist = 8 + pseudoRandom(i + 600) * 15;
+                
+                const crystalGeo = new THREE.OctahedronGeometry(0.3);
+                const crystalMat = new THREE.MeshBasicMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                crystal.position.set(
+                    Math.cos(angle) * dist,
+                    pseudoRandom(i + 700) * 4,
+                    Math.sin(angle) * dist
+                );
+                crystal.userData.isCrystal = true;
+                
+                scene.add(crystal);
+                gameState.crystals.push(crystal);
+            }
+            
+            // Generate void rifts
+            const numRifts = Math.min(gameState.level, 3);
+            for (let i = 0; i < numRifts; i++) {
+                const angle = pseudoRandom(i + 800) * Math.PI * 2;
+                const dist = 12 + pseudoRandom(i + 900) * 10;
+                
+                const riftGeo = new THREE.SphereGeometry(0.5, 16, 16);
+                const riftMat = new THREE.MeshBasicMaterial({
+                    color: 0xff4400,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                const rift = new THREE.Mesh(riftGeo, riftMat);
+                rift.position.set(
+                    Math.cos(angle) * dist,
+                    pseudoRandom(i + 1000) * 4 - 2,
+                    Math.sin(angle) * dist
+                );
+                rift.userData.isRift = true;
+                rift.userData.size = 0.5;
+                
+                scene.add(rift);
+                gameState.rifts.push(rift);
+            }
+            
+            // Add ambient particles
+            const particleGeo = new THREE.BufferGeometry();
+            const particleCount = 500;
+            const positions = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 100;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 50;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+            }
+            
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const particleMat = new THREE.PointsMaterial({
+                color: 0x4444ff,
+                size: 0.1,
+                transparent: true,
+                opacity: 0.6
+            });
+            
+            const particles = new THREE.Points(particleGeo, particleMat);
+            scene.add(particles);
+            gameState.particles = particles;
+            
+            updateHUD();
+        }
+        
+        // ============ INPUT HANDLING ============
+        const raycaster = new THREE.Raycaster();
+        const center = new THREE.Vector2(0, 0);
+        
+        document.addEventListener('keydown', (e) => {
+            if (!gameState.playing) return;
+            switch (e.code) {
+                case 'KeyW': gameState.moveForward = true; break;
+                case 'KeyS': gameState.moveBackward = true; break;
+                case 'KeyA': gameState.moveLeft = true; break;
+                case 'KeyD': gameState.moveRight = true; break;
+                case 'Space':
+                    if (gameState.canJump) {
+                        gameState.velocity.y = 8;
+                        gameState.canJump = false;
+                    }
+                    break;
+                case 'ShiftLeft': gameState.isSprinting = true; break;
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            switch (e.code) {
+                case 'KeyW': gameState.moveForward = false; break;
+                case 'KeyS': gameState.moveBackward = false; break;
+                case 'KeyA': gameState.moveLeft = false; break;
+                case 'KeyD': gameState.moveRight = false; break;
+                case 'ShiftLeft': gameState.isSprinting = false; break;
+            }
+        });
+        
+        document.addEventListener('click', async () => {
+            if (!gameState.playing) return;
+            
+            await initAudio();
+            
+            // Raycast for anchoring
+            raycaster.setFromCamera(center, camera);
+            const intersects = raycaster.intersectObjects(gameState.anchorables);
+            
+            if (intersects.length > 0 && gameState.resonance > 0) {
+                const target = intersects[0].object;
+                
+                if (!target.userData.anchored && gameState.mapped < gameState.mappedNeeded) {
+                    // Anchor the point
+                    target.userData.anchored = true;
+                    target.material.color.setHex(0x00ff88);
+                    target.material.opacity = 1;
+                    target.scale.setScalar(1.5);
+                    
+                    // Add anchored visual
+                    const anchorGeo = new THREE.SphereGeometry(0.3);
+                    const anchorMat = new THREE.MeshBasicMaterial({
+                        color: 0x00ff88,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const anchor = new THREE.Mesh(anchorGeo, anchorMat);
+                    anchor.position.copy(target.position);
+                    scene.add(anchor);
+                    gameState.anchoredPoints.push(anchor);
+                    
+                    gameState.resonance--;
+                    gameState.mapped++;
+                    
+                    playAnchorSound();
+                    updateHUD();
+                    
+                    // Check if level complete
+                    if (gameState.mapped >= gameState.mappedNeeded) {
+                        completeLevel();
+                    }
+                }
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!gameState.playing) return;
+            if (document.pointerLockElement !== renderer.domElement) return;
+            
+            const sensitivity = 0.002;
+            gameState.euler.y -= e.movementX * sensitivity;
+            gameState.euler.x -= e.movementY * sensitivity;
+            gameState.euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, gameState.euler.x));
+            
+            camera.quaternion.setFromEuler(gameState.euler);
+        });
+        
+        renderer.domElement.addEventListener('click', () => {
+            if (gameState.playing) {
+                renderer.domElement.requestPointerLock();
+            }
+        });
+        
+        // ============ UI UPDATES ============
+        function updateHUD() {
+            document.getElementById('resonance').textContent = `RESONANCE: ${gameState.resonance}`;
+            document.getElementById('level').textContent = `EDGE WORLD ${gameState.level}/${gameState.maxLevels}`;
+            document.getElementById('mapped').textContent = `MAPPED: ${gameState.mapped}/${gameState.mappedNeeded}`;
+        }
+        
+        function showWarning(show) {
+            const warning = document.getElementById('warning');
+            if (show) {
+                warning.classList.add('active');
+            } else {
+                warning.classList.remove('active');
+            }
+        }
+        
+        // ============ GAME LOGIC ============
+        function completeLevel() {
+            playVictorySound();
+            
+            if (gameState.level >= gameState.maxLevels) {
+                // Victory!
+                gameState.playing = false;
+                document.exitPointerLock();
+                document.getElementById('victory').classList.remove('hidden');
+                stopAmbient();
+            } else {
+                // Next level
+                gameState.level++;
+                gameState.resonance = 3;
+                setTimeout(() => {
+                    generateWorld();
+                    playAmbient();
+                }, 1500);
+            }
+        }
+        
+        function gameOver() {
+            gameState.playing = false;
+            document.exitPointerLock();
+            document.getElementById('game-over').classList.remove('hidden');
+            stopAmbient();
+        }
+        
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over').classList.add('hidden');
+            document.getElementById('victory').classList.add('hidden');
+            
+            gameState.level = 1;
+            gameState.resonance = 3;
+            gameState.playing = true;
+            
+            generateWorld();
+            playAmbient();
+            
+            renderer.domElement.requestPointerLock();
+        }
+        
+        // Event listeners for buttons
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('restart-btn').addEventListener('click', startGame);
+        document.getElementById('play-again-btn').addEventListener('click', startGame);
+        
+        // ============ PHYSICS & ANIMATION ============
+        const clock = new THREE.Clock();
+        
+        function update() {
+            if (!gameState.playing) return;
+            
+            const delta = clock.getDelta();
+            
+            // Movement
+            const speed = gameState.isSprinting ? 20 : 10;
+            const direction = new THREE.Vector3();
+            
+            if (gameState.moveForward) direction.z -= 1;
+            if (gameState.moveBackward) direction.z += 1;
+            if (gameState.moveLeft) direction.x -= 1;
+            if (gameState.moveRight) direction.x += 1;
+            
+            direction.normalize();
+            direction.applyQuaternion(camera.quaternion);
+            direction.y = 0;
+            direction.normalize();
+            
+            camera.position.x += direction.x * speed * delta;
+            camera.position.z += direction.z * speed * delta;
+            
+            // Gravity
+            gameState.velocity.y -= 20 * delta;
+            camera.position.y += gameState.velocity.y * delta;
+            
+            // Ground collision
+            if (camera.position.y < 2) {
+                camera.position.y = 2;
+                gameState.velocity.y = 0;
+                gameState.canJump = true;
+            }
+            
+            // Update player light
+            playerLight.position.copy(camera.position);
+            
+            // Animate anchorables
+            const time = clock.elapsedTime;
+            gameState.anchorables.forEach((obj, i) => {
+                if (!obj.userData.anchored) {
+                    obj.rotation.x += delta * 0.5;
+                    obj.rotation.y += delta * 0.3;
+                    obj.position.y += Math.sin(time + i) * 0.01;
+                }
+            });
+            
+            // Animate crystals
+            gameState.crystals.forEach((crystal, i) => {
+                crystal.rotation.y += delta * 2;
+                crystal.rotation.x += delta;
+                crystal.position.y += Math.sin(time * 2 + i) * 0.005;
+                
+                // Collision with player
+                const dist = camera.position.distanceTo(crystal.position);
+                if (dist < 1.5) {
+                    // Collect crystal
+                    scene.remove(crystal);
+                    gameState.crystals.splice(i, 1);
+                    gameState.resonance++;
+                    playCrystalSound();
+                    updateHUD();
+                }
+            });
+            
+            // Animate and check rifts
+            gameState.rifts.forEach((rift, i) => {
+                rift.rotation.y += delta;
+                rift.userData.size += delta * 0.1;
+                rift.scale.setScalar(rift.userData.size);
+                
+                // Play warning sound
+                if (Math.random() < 0.02) {
+                    playRiftSound();
+                }
+                
+                // Check collision
+                const dist = camera.position.distanceTo(rift.position);
+                if (dist < rift.userData.size + 0.5) {
+                    gameOver();
+                }
+            });
+            
+            // Check Silence proximity
+            const closestRift = gameState.rifts.reduce((min, rift) => {
+                const dist = camera.position.distanceTo(rift.position);
+                return dist < min ? dist : min;
+            }, Infinity);
+            
+            if (closestRift < gameState.warningThreshold) {
+                showWarning(true);
+                gameState.silenceDistance = closestRift;
+            } else {
+                showWarning(false);
+            }
+            
+            // Animate particles
+            if (gameState.particles) {
+                gameState.particles.rotation.y += delta * 0.02;
+            }
+        }
+        
+        // ============ RENDER LOOP ============
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            update();
+            composer.render();
+        }
+        
+        // ============ WINDOW RESIZE ============
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        animate();
+    </script>
+</body>
+</html>
